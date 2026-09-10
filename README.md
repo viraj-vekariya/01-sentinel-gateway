@@ -2,7 +2,10 @@
 
 **[▶ Live demo](https://viraj-vekariya.github.io/01-sentinel-gateway/)** — the token bucket runs in your browser, [verified against the compiled C++ extension](tools/check_js_matches_native.py).
 
-**[⇧ Deploy it yourself](https://render.com/deploy?repo=https://github.com/viraj-vekariya/01-sentinel-gateway)** — one click builds `render.yaml` on Render's free tier: the gateway and its Python upstream in one container. No card, no configuration.
+**[⇧ Deploy your own copy](https://render.com/deploy?repo=https://github.com/viraj-vekariya/01-sentinel-gateway)** — one click builds `render.yaml` on Render's free tier: the gateway and its Python upstream in one container. No card, no configuration.
+
+**[◆ Live API](https://sentinel-gateway-24sd.onrender.com)** — the real gateway. The C++ token bucket is loaded natively - send `x-api-key` with `x-tier: free` and burst it to see 429s with a computed `retry_after_sec`. `pricing-java` is undeployed, so its circuit breaker is genuinely OPEN; `/health` says why.
+Free tier, so a cold instance takes ~50s to wake.
 
 An API gateway in front of two polyglot backends (Python + Java), doing token-bucket
 rate limiting in a C++ extension, unsupervised anomaly scoring on request patterns,
