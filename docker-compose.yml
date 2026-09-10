@@ -1,0 +1,60 @@
+# Local full stack: gateway + both upstreams.
+#
+#   docker compose up --build
+#   open http://localhost:8000
+#
+# The gateway waits for both upstreams to report healthy before starting. Without
+# depends_on/condition it would start first, fail its first proxied requests, and
+# open both circuit breakers before the system had finished booting - a self-inflicted
+# outage on every deploy.
+
+services:
+  catalog:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.catalog
+    environment:
+      CATALOG_FAIL_RATE: "${CATALOG_FAIL_RATE:-0.0}"
+      CATALOG_LATENCY_MS: "${CATALOG_LATENCY_MS:-0}"
+    ports: ["8101:8101"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8101/health',timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  pricing:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.pricing
+    environment:
+      PRICING_FAIL_RATE: "${PRICING_FAIL_RATE:-0.0}"
+      PRICING_LATENCY_MS: "${PRICING_LATENCY_MS:-0}"
+    ports: ["8102:8102"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8102/api/pricing/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 25s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.gateway
+    environment:
+      SENTINEL_UPSTREAM_PY: "http://catalog:8101"
+      SENTINEL_UPSTREAM_JAVA: "http://pricing:8102"
+      SENTINEL_LLM_PROVIDER: "${SENTINEL_LLM_PROVIDER:-offline}"
+      # Passed through but never baked into the image. An API key in a layer is in
+      # the registry forever, for anyone who can pull the image.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    ports: ["8000:8000"]
+    depends_on:
+      catalog: {condition: service_healthy}
+      pricing: {condition: service_healthy}
+    volumes:
+      - sentinel-data:/app/outputs
+
+volumes:
+  sentinel-data:

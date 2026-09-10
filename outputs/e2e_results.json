@@ -1,0 +1,305 @@
+{
+  "generated_at": "2026-09-10T05:26:16",
+  "gateway": {
+    "limiter_backend": "native",
+    "detector": "robust_z",
+    "explainer": "offline"
+  },
+  "phases": {
+    "normal": {
+      "requests": 80,
+      "status_codes": {
+        "200": 80
+      }
+    },
+    "pricing": {
+      "requests": 30,
+      "status_codes": {
+        "200": 22,
+        "429": 8
+      }
+    },
+    "burst": {
+      "requests": 60,
+      "status_codes": {
+        "200": 15,
+        "429": 45
+      }
+    },
+    "scanner": {
+      "requests": 90,
+      "status_codes": {
+        "404": 24,
+        "429": 66
+      }
+    }
+  },
+  "totals": {
+    "requests_total": 260,
+    "status_2xx": 117,
+    "flagged_total": 147,
+    "status_4xx": 143,
+    "rate_limited_total": 119
+  },
+  "latency": {
+    "count": 260,
+    "mean_ms": 2.57,
+    "min_ms": 0.004,
+    "max_ms": 43.029,
+    "p50_ms": 2.0,
+    "p95_ms": 25.0,
+    "p99_ms": 25.0
+  },
+  "limiter": {
+    "backend": "native",
+    "native_available": true,
+    "policies": 6,
+    "tracked_clients": 19,
+    "allowed": 141,
+    "denied": 119,
+    "deny_rate": 0.4577
+  },
+  "anomaly": {
+    "detector": "robust_z",
+    "sklearn_available": true,
+    "fitted": true,
+    "fitted_clients": 11,
+    "min_clients": 5,
+    "min_observations": 5,
+    "min_clients_for_forest": 50,
+    "forest_active": false,
+    "fitted_age_sec": 2.0,
+    "threshold": 0.65
+  },
+  "breakers": {
+    "catalog-py": {
+      "base_url": "http://127.0.0.1:8101",
+      "state": "closed",
+      "consecutive_failures": 0,
+      "trips": 0,
+      "reset_in_sec": 0.0
+    },
+    "pricing-java": {
+      "base_url": "http://127.0.0.1:8102",
+      "state": "closed",
+      "consecutive_failures": 0,
+      "trips": 0,
+      "reset_in_sec": 0.0
+    }
+  },
+  "peak_anomaly_score_by_client": {
+    "scanner-bot": 0.9028,
+    "burst-client": 0.9948,
+    "pricing-client": 0.8441,
+    "tyrell": 0.3357,
+    "wayne": 0.0745,
+    "stark": 0.1829,
+    "hooli": 0.1665,
+    "umbrella": 0.0818,
+    "initech": 0.0284,
+    "globex": 0.4067,
+    "acme": 0.1265
+  },
+  "mean_anomaly_score_by_client": {
+    "scanner-bot": 0.8363,
+    "burst-client": 0.9251,
+    "pricing-client": 0.7143,
+    "tyrell": 0.0569,
+    "wayne": 0.0323,
+    "stark": 0.061,
+    "hooli": 0.0643,
+    "umbrella": 0.0099,
+    "initech": 0.0075,
+    "globex": 0.1671,
+    "acme": 0.0485
+  },
+  "separation": {
+    "worst_normal_client_peak": 0.4067,
+    "scanner_peak": 0.9028,
+    "margin": 0.4961,
+    "detector_threshold": 0.65,
+    "scanner_flagged": true,
+    "any_normal_client_flagged": false
+  },
+  "top_clients": [
+    {
+      "client_id": "scanner-bot",
+      "tier": "free",
+      "requests": 90,
+      "limited": 66,
+      "flagged": 79,
+      "avg_score": 0.8363
+    },
+    {
+      "client_id": "burst-client",
+      "tier": "free",
+      "requests": 60,
+      "limited": 45,
+      "flagged": 49,
+      "avg_score": 0.9251
+    },
+    {
+      "client_id": "pricing-client",
+      "tier": "paid",
+      "requests": 30,
+      "limited": 8,
+      "flagged": 19,
+      "avg_score": 0.7143
+    },
+    {
+      "client_id": "globex",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.1981
+    },
+    {
+      "client_id": "hooli",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0638
+    },
+    {
+      "client_id": "initech",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0073
+    },
+    {
+      "client_id": "stark",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0445
+    },
+    {
+      "client_id": "tyrell",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0745
+    },
+    {
+      "client_id": "acme",
+      "tier": "free",
+      "requests": 6,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0493
+    },
+    {
+      "client_id": "umbrella",
+      "tier": "free",
+      "requests": 6,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0158
+    },
+    {
+      "client_id": "wayne",
+      "tier": "free",
+      "requests": 6,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0377
+    },
+    {
+      "client_id": "acme",
+      "tier": "paid",
+      "requests": 4,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0471
+    },
+    {
+      "client_id": "umbrella",
+      "tier": "paid",
+      "requests": 4,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.001
+    },
+    {
+      "client_id": "wayne",
+      "tier": "paid",
+      "requests": 4,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.024
+    },
+    {
+      "client_id": "globex",
+      "tier": "paid",
+      "requests": 3,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.095
+    },
+    {
+      "client_id": "hooli",
+      "tier": "paid",
+      "requests": 3,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0655
+    },
+    {
+      "client_id": "initech",
+      "tier": "paid",
+      "requests": 3,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0081
+    },
+    {
+      "client_id": "stark",
+      "tier": "paid",
+      "requests": 3,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0993
+    },
+    {
+      "client_id": "tyrell",
+      "tier": "paid",
+      "requests": 3,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0158
+    }
+  ],
+  "flagged_examples": [
+    {
+      "client_id": "scanner-bot",
+      "score": 0.8738,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (69.2 MAD); path entropy unusually high (50.0 MAD)"
+    },
+    {
+      "client_id": "scanner-bot",
+      "score": 0.8738,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (69.2 MAD); path entropy unusually high (50.0 MAD)"
+    },
+    {
+      "client_id": "scanner-bot",
+      "score": 0.8736,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (69.1 MAD); path entropy unusually high (50.0 MAD)"
+    },
+    {
+      "client_id": "scanner-bot",
+      "score": 0.8736,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (69.1 MAD); path entropy unusually high (50.0 MAD)"
+    },
+    {
+      "client_id": "scanner-bot",
+      "score": 0.8737,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (69.2 MAD); path entropy unusually high (50.0 MAD)"
+    }
+  ]
+}

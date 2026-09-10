@@ -1,0 +1,169 @@
+{
+  "environment": {
+    "python": "3.13.9",
+    "machine": "arm64",
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "gil_enabled": true
+  },
+  "config": {
+    "requests_per_thread": 40000,
+    "repeats": 5,
+    "distinct_clients": 512,
+    "stripes": 16,
+    "thread_counts": [
+      1,
+      2,
+      4,
+      8
+    ]
+  },
+  "samples": [
+    {
+      "backend": "python",
+      "threads": 1,
+      "requests": 40000,
+      "seconds": 0.0185,
+      "throughput": 2162181.6,
+      "per_request_us": 0.4625
+    },
+    {
+      "backend": "native_hold_gil",
+      "threads": 1,
+      "requests": 40000,
+      "seconds": 0.007342,
+      "throughput": 5448323.5,
+      "per_request_us": 0.1835
+    },
+    {
+      "backend": "native_release_gil",
+      "threads": 1,
+      "requests": 40000,
+      "seconds": 0.008098,
+      "throughput": 4939770.6,
+      "per_request_us": 0.2024
+    },
+    {
+      "backend": "native_batched",
+      "threads": 1,
+      "requests": 40000,
+      "seconds": 0.005643,
+      "throughput": 7088950.7,
+      "per_request_us": 0.1411
+    },
+    {
+      "backend": "python",
+      "threads": 2,
+      "requests": 80000,
+      "seconds": 0.03656,
+      "throughput": 2188188.8,
+      "per_request_us": 0.457
+    },
+    {
+      "backend": "native_hold_gil",
+      "threads": 2,
+      "requests": 80000,
+      "seconds": 0.014955,
+      "throughput": 5349441.2,
+      "per_request_us": 0.1869
+    },
+    {
+      "backend": "native_release_gil",
+      "threads": 2,
+      "requests": 80000,
+      "seconds": 0.039132,
+      "throughput": 2044353.9,
+      "per_request_us": 0.4892
+    },
+    {
+      "backend": "native_batched",
+      "threads": 2,
+      "requests": 80000,
+      "seconds": 0.011538,
+      "throughput": 6933911.1,
+      "per_request_us": 0.1442
+    },
+    {
+      "backend": "python",
+      "threads": 4,
+      "requests": 160000,
+      "seconds": 0.0725,
+      "throughput": 2206888.9,
+      "per_request_us": 0.4531
+    },
+    {
+      "backend": "native_hold_gil",
+      "threads": 4,
+      "requests": 160000,
+      "seconds": 0.029444,
+      "throughput": 5433998.1,
+      "per_request_us": 0.184
+    },
+    {
+      "backend": "native_release_gil",
+      "threads": 4,
+      "requests": 160000,
+      "seconds": 0.160946,
+      "throughput": 994121.2,
+      "per_request_us": 1.0059
+    },
+    {
+      "backend": "native_batched",
+      "threads": 4,
+      "requests": 160000,
+      "seconds": 0.023074,
+      "throughput": 6934349.3,
+      "per_request_us": 0.1442
+    },
+    {
+      "backend": "python",
+      "threads": 8,
+      "requests": 320000,
+      "seconds": 0.14556,
+      "throughput": 2198408.7,
+      "per_request_us": 0.4549
+    },
+    {
+      "backend": "native_hold_gil",
+      "threads": 8,
+      "requests": 320000,
+      "seconds": 0.059413,
+      "throughput": 5386000.2,
+      "per_request_us": 0.1857
+    },
+    {
+      "backend": "native_release_gil",
+      "threads": 8,
+      "requests": 320000,
+      "seconds": 0.699194,
+      "throughput": 457669.8,
+      "per_request_us": 2.185
+    },
+    {
+      "backend": "native_batched",
+      "threads": 8,
+      "requests": 320000,
+      "seconds": 0.045869,
+      "throughput": 6976452.7,
+      "per_request_us": 0.1433
+    }
+  ],
+  "scaling_1_to_8": {
+    "python": 1.017,
+    "native_hold_gil": 0.989,
+    "native_release_gil": 0.093,
+    "native_batched": 0.984
+  },
+  "decomposition_at_8_threads": {
+    "compiled_vs_interpreted": 2.45,
+    "effect_of_releasing_gil": 0.085,
+    "effect_of_batching_releases": 15.243,
+    "net_best_vs_python": 3.173,
+    "batch_size": 256
+  },
+  "peak_throughput": {
+    "python": 2206888.9,
+    "native_hold_gil": 5448323.5,
+    "native_release_gil": 4939770.6,
+    "native_batched": 7088950.7
+  }
+}

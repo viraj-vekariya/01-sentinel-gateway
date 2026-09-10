@@ -1,0 +1,23 @@
+# Render deployment (alternative to Fly). Also builds the image remotely.
+#   render blueprint launch   # or connect the repo in the Render dashboard
+services:
+  - type: web
+    name: sentinel-gateway
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.gateway
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: SENTINEL_HOST
+        value: 0.0.0.0
+      - key: SENTINEL_PORT
+        value: "8000"
+      - key: SENTINEL_LLM_PROVIDER
+        value: offline
+      - key: ANTHROPIC_API_KEY
+        sync: false          # set in the dashboard; never committed
+    disk:
+      name: sentinel-data
+      mountPath: /app/outputs
+      sizeGB: 1

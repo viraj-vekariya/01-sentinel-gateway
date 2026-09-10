@@ -1,0 +1,116 @@
+{
+  "project": "Sentinel Gateway",
+  "role": "CV1 / Software Development + Applied AI - system design backbone",
+  "generated_at": "2026-09-10T05:31:38",
+  "verified_on": {
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "python": "3.13.9",
+    "java": "21.0.12.1"
+  },
+  "lines_of_code": {
+    "cpp": 487,
+    "python_gateway": 2170,
+    "python_service": 149,
+    "java": 287,
+    "dashboard": 281,
+    "bench": 452,
+    "tests": 687,
+    "infra": 389,
+    "total": 4902
+  },
+  "tests": {
+    "summary": "64 passed, 1 skipped in 6.78s",
+    "suites": [
+      "ratelimit",
+      "anomaly",
+      "proxy",
+      "store",
+      "gateway"
+    ]
+  },
+  "headline_finding": {
+    "claim_tested": "Moving the rate-limiter hot path into a C++ extension that releases the GIL will raise gateway throughput.",
+    "verdict": "FALSE as stated. Releasing the GIL per request is a 12x PESSIMISATION, because the release/reacquire round trip costs far more than the ~200ns critical section it protects. The win is real but comes from compilation, and from amortising the GIL release over a batch - not from releasing it per call.",
+    "decomposition_at_8_threads": {
+      "compiled_vs_interpreted": 2.45,
+      "effect_of_releasing_gil": 0.085,
+      "effect_of_batching_releases": 15.243,
+      "net_best_vs_python": 3.173,
+      "batch_size": 256
+    },
+    "throughput_req_per_sec": {
+      "python": 2206888.9,
+      "native_hold_gil": 5448323.5,
+      "native_release_gil": 4939770.6,
+      "native_batched": 7088950.7
+    },
+    "scaling_1_to_8_threads": {
+      "python": 1.017,
+      "native_hold_gil": 0.989,
+      "native_release_gil": 0.093,
+      "native_batched": 0.984
+    },
+    "consequence": "gateway/ratelimit/limiter.py calls check_holding_gil on the request path and reserves the GIL-releasing entry point for check_batch. The measurement changed the production code."
+  },
+  "second_finding": {
+    "claim_tested": "Flag a client when its anomaly score crosses the threshold.",
+    "verdict": "Per-request scoring false-positives on cold-start transients. Flagging on the MEDIAN of a short score window separated real anomalies from normal clients 6x better on identical traffic.",
+    "separation_margin_per_request": 0.0908,
+    "separation_margin_sustained": 0.5476,
+    "improvement": "6.0x",
+    "false_positives_per_request": 1,
+    "false_positives_sustained": 0
+  },
+  "third_finding": {
+    "claim_tested": "IsolationForest is the right unsupervised detector here.",
+    "verdict": "Only above a real population. Fitted on 5 clients it gave two different anomalies the identical saturated score (0.8049) and a normal client 0.7607 - a 0.04 margin. The robust z-score on the same data separated them by orders of magnitude. The forest is now gated behind min_clients_for_forest=50."
+  },
+  "end_to_end": {
+    "traffic": {
+      "normal": 80,
+      "pricing": 30,
+      "burst": 60,
+      "scanner": 90
+    },
+    "rate_limiter": {
+      "burst_requests": 60,
+      "rejected_429": 45
+    },
+    "detector": {
+      "worst_normal_client_peak": 0.4067,
+      "scanner_peak": 0.9028,
+      "margin": 0.4961,
+      "detector_threshold": 0.65,
+      "scanner_flagged": true,
+      "any_normal_client_flagged": false
+    },
+    "flagged_clients": [
+      "scanner-bot"
+    ],
+    "example_reason": "sustained 0.87 over 8 requests: request rate unusually high (69.2 MAD); path entropy unusually high (50.0 MAD)",
+    "latency": {
+      "count": 260,
+      "mean_ms": 2.57,
+      "min_ms": 0.004,
+      "max_ms": 43.029,
+      "p50_ms": 2.0,
+      "p95_ms": 25.0,
+      "p99_ms": 25.0
+    }
+  },
+  "bugs_found_by_running_it": [
+    "sqlite ':memory:' gives each CONNECTION its own database - a thread-local pool handed every thread an empty one and writes vanished. Fixed with a shared-cache URI.",
+    "shared-cache sqlite takes a TABLE lock and returns SQLITE_LOCKED immediately, ignoring `timeout` - 3 concurrent writers dropped rows. Fixed with a write mutex.",
+    "a fixed shared-cache NAME made every Store(':memory:') in a process the same database, so independent tests saw each other's rows. Fixed with a per-instance name.",
+    "anomaly min_history conflated 'clients needed to fit' with 'observations per client', so 7 real clients never satisfied a threshold of 30 and the detector silently scored everything 0.0 forever.",
+    "MAD collapse: when a feature's median is 0 the scale estimate is 0 and every deviation ran to 1e9. Fixed with relative AND absolute scale floors.",
+    "integration tests assumed 'no upstream is running' and failed on a machine where the demo services were up. Pinned to dead ports."
+  ],
+  "known_limits": [
+    "Rate-limit state is per-process and in-memory. Two gateway replicas enforce two independent limits; a shared Redis or a consistent-hash router is needed before horizontal scaling.",
+    "The anomaly baseline is also per-process, so replicas learn different norms.",
+    "The IsolationForest path is implemented and tested but does not activate below 50 clients, which the demo does not reach - the measured results are the robust-z detector.",
+    "LLM explanations default to offline templates. The Anthropic path is implemented but is only exercised when ANTHROPIC_API_KEY is set.",
+    "Benchmarked on one machine (Apple M-series, CPython 3.13). The GIL result is expected to hold on any CPython with the GIL enabled but has not been re-measured on x86 or on a free-threaded build."
+  ]
+}

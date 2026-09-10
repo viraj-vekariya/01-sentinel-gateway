@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+RUN useradd --create-home --uid 10002 catalog
+WORKDIR /app
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic
+COPY services/python-service/app.py .
+USER catalog
+ENV PYTHONUNBUFFERED=1 CATALOG_HOST=0.0.0.0 CATALOG_PORT=8101
+EXPOSE 8101
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
+    CMD python -c "import urllib.request,sys; \
+        sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8101/health',timeout=2).status==200 else 1)"
+CMD ["python", "app.py"]

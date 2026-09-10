@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pricing service - upstream #2, Java/Spring Boot.
+
+  This module exists to prove the gateway is genuinely language-agnostic. Sentinel
+  routes to it over plain HTTP with no Java-specific code anywhere in the gateway,
+  which is the whole point: if swapping a backend's language required touching the
+  gateway, the gateway would not be one.
+
+  Spring Boot rather than a bare HTTP server because it is what a Java backend in
+  industry actually looks like, and the failure modes worth demonstrating (thread
+  pool exhaustion, GC pauses under load) only appear in a realistic stack.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.4</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>dev.sentinel</groupId>
+  <artifactId>pricing-service</artifactId>
+  <version>1.0.0</version>
+  <name>pricing-service</name>
+  <description>Pricing upstream for Sentinel Gateway</description>
+
+  <properties>
+    <java.version>21</java.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

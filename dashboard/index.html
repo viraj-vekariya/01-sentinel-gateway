@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel Gateway — Ops</title>
+<!--
+  Ops console for Sentinel Gateway.
+
+  React over CDN with no build step. That is a deliberate choice, not a shortcut:
+  this dashboard is a single operator-facing page served by the gateway itself, and
+  adding a bundler would mean the gateway container needed a Node toolchain to
+  produce one HTML file. Babel-in-the-browser costs ~200ms of first-paint compile,
+  which is irrelevant for a page an on-call engineer leaves open for hours.
+  See DECISIONS.md D-11.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.2/babel.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#131a23; --panel2:#182230; --line:#243040;
+    --text:#e6edf3; --dim:#8b9bb0; --accent:#4da3ff;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --flag:#bc6cff;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+  .wrap{max-width:1400px;margin:0 auto;padding:20px 16px 60px}
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  h1{font-size:20px;margin:0;letter-spacing:-.02em}
+  .sub{color:var(--dim);font-size:13px}
+  .pill{font:600 11px var(--mono);padding:3px 8px;border-radius:999px;
+        border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .pill.live{color:var(--ok);border-color:#1f4a2a}
+  .pill.dead{color:var(--bad);border-color:#5c2224}
+  .grid{display:grid;gap:12px;margin-top:16px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}
+  .cols{grid-template-columns:1.35fr 1fr}
+  @media(max-width:900px){.cols{grid-template-columns:1fr}}
+  .card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .card{padding:12px 14px}
+  .card .label{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .card .value{font:600 24px/1.2 var(--mono);margin-top:6px;letter-spacing:-.02em}
+  .card .foot{color:var(--dim);font-size:11px;margin-top:2px;font-family:var(--mono)}
+  .panel{padding:0;overflow:hidden}
+  .panel h2{font-size:13px;margin:0;padding:11px 14px;border-bottom:1px solid var(--line);
+            color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:600;
+            display:flex;justify-content:space-between;align-items:center}
+  .scroll{max-height:420px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  th{position:sticky;top:0;background:var(--panel2);color:var(--dim);text-align:left;
+     padding:7px 10px;font-weight:600;font-size:11px;border-bottom:1px solid var(--line)}
+  td{padding:6px 10px;border-bottom:1px solid #1b2530;white-space:nowrap}
+  tr.flagged td{background:rgba(188,108,255,.08)}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover td{background:#1c2735}
+  .s2{color:var(--ok)} .s4{color:var(--warn)} .s5{color:var(--bad)}
+  .bar{height:5px;border-radius:3px;background:#1e2836;overflow:hidden;margin-top:7px}
+  .bar>i{display:block;height:100%;background:var(--accent)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+  button{font:600 12px/1 inherit;padding:8px 13px;border-radius:7px;cursor:pointer;
+         border:1px solid var(--line);background:var(--panel2);color:var(--text)}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06121f}
+  button.danger{border-color:#5c2224;color:var(--bad)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .empty{padding:26px 14px;color:var(--dim);text-align:center;font-size:12px}
+  .expl{padding:11px 14px;border-bottom:1px solid #1b2530}
+  .expl .who{font:600 12px var(--mono);color:var(--flag)}
+  .expl .txt{font-size:12.5px;color:#c9d4e0;margin-top:4px}
+  .expl .meta{font:11px var(--mono);color:var(--dim);margin-top:5px}
+  .brk{display:flex;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #1b2530;
+       font-family:var(--mono);font-size:12px}
+  .st-closed{color:var(--ok)} .st-open{color:var(--bad)} .st-half_open{color:var(--warn)}
+  code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef} = React;
+
+const fmt = n => n===null||n===undefined ? "—" : (typeof n==="number"
+  ? (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)) : n);
+const clsFor = s => s>=500?"s5":s>=400?"s4":"s2";
+const ago = ts => { const d=Date.now()/1000-ts; return d<60?`${d|0}s`:`${(d/60)|0}m`; };
+
+function Card({label,value,foot,pct}){
+  return <div className="card">
+    <div className="label">{label}</div>
+    <div className="value">{value}</div>
+    {foot && <div className="foot">{foot}</div>}
+    {pct!==undefined && <div className="bar"><i style={{width:Math.min(100,pct)+"%"}}/></div>}
+  </div>;
+}
+
+function Events({events,onPick}){
+  if(!events.length) return <div className="empty">No traffic yet — press <b>Send normal traffic</b>.</div>;
+  return <div className="scroll"><table>
+    <thead><tr><th>when</th><th>client</th><th>tier</th><th>path</th>
+      <th>status</th><th>ms</th><th>score</th><th>upstream</th></tr></thead>
+    <tbody>{events.map((e,i)=>
+      <tr key={i} className={(e.flagged?"flagged ":"")+"clickable"} onClick={()=>onPick(e)}>
+        <td style={{color:"var(--dim)"}}>{ago(e.ts)}</td>
+        <td>{e.client_id}</td><td style={{color:"var(--dim)"}}>{e.tier}</td>
+        <td>{e.path}</td>
+        <td className={clsFor(e.status)}>{e.status}</td>
+        <td>{e.latency_ms.toFixed(1)}</td>
+        <td style={{color:e.flagged?"var(--flag)":"var(--dim)"}}>{e.anomaly_score.toFixed(3)}</td>
+        <td style={{color:"var(--dim)"}}>{e.upstream||"—"}</td>
+      </tr>)}</tbody>
+  </table></div>;
+}
+
+function Flagged({events}){
+  const f = events.filter(e=>e.flagged);
+  if(!f.length) return <div className="empty">Nothing flagged. Run <b>Simulate a scanner</b> to trip the detector.</div>;
+  return <div className="scroll">{f.map((e,i)=>
+    <div className="expl" key={i}>
+      <div className="who">{e.client_id} · score {e.anomaly_score.toFixed(3)} · {e.tier}</div>
+      <div className="txt">{e.reason||"—"}</div>
+      <div className="meta">{e.method} {e.path} → {e.status} · {e.latency_ms.toFixed(1)}ms · {ago(e.ts)} ago</div>
+    </div>)}</div>;
+}
+
+function Breakers({breakers}){
+  const names = Object.keys(breakers||{});
+  if(!names.length) return <div className="empty">No upstreams.</div>;
+  return <div>{names.map(n=>{
+    const b=breakers[n];
+    return <div className="brk" key={n}>
+      <span>{n}<span style={{color:"var(--dim)"}}> · {b.base_url}</span></span>
+      <span className={"st-"+b.state}>{b.state}
+        {b.consecutive_failures>0 && ` · ${b.consecutive_failures} fails`}
+        {b.state==="open" && ` · retry in ${b.reset_in_sec}s`}
+        {b.trips>0 && ` · ${b.trips} trips`}
+      </span>
+    </div>;})}</div>;
+}
+
+function App(){
+  const [metrics,setMetrics]=useState(null);
+  const [events,setEvents]=useState([]);
+  const [live,setLive]=useState(true);
+  const [busy,setBusy]=useState("");
+  const [picked,setPicked]=useState(null);
+  const [err,setErr]=useState(false);
+
+  const poll = useCallback(async()=>{
+    try{
+      const [m,e] = await Promise.all([
+        fetch("/metrics").then(r=>r.json()),
+        fetch("/events?limit=60").then(r=>r.json()),
+      ]);
+      setMetrics(m); setEvents(e.events||[]); setErr(false);
+    }catch(_){ setErr(true); }
+  },[]);
+
+  useEffect(()=>{ poll(); if(!live) return;
+    const id=setInterval(poll,1500); return ()=>clearInterval(id); },[live,poll]);
+
+  // Traffic generation runs in the BROWSER, not the server. The gateway must not
+  // ship an endpoint that makes it attack itself — that would be a live SSRF surface
+  // on an ops console. Driving it from fetch() here keeps the demo entirely
+  // client-side and uses the exact same public path any real client would.
+  const drive = async (label, plan) => {
+    setBusy(label);
+    try{ await plan(); } finally { setBusy(""); poll(); }
+  };
+
+  const normal = () => drive("normal", async()=>{
+    const clients=["acme","globex","initech","umbrella","hooli"];
+    for(let i=0;i<40;i++){
+      const c=clients[i%clients.length];
+      await fetch(`/api/catalog/items?limit=5&offset=${i}`,
+        {headers:{"x-api-key":c,"x-tier":i%3===0?"paid":"free"}}).catch(()=>{});
+      await new Promise(r=>setTimeout(r,60+Math.random()*140));
+    }
+  });
+
+  const priced = () => drive("pricing", async()=>{
+    for(let i=0;i<20;i++){
+      await fetch(`/api/pricing/quote?itemId=${40+i}&quantity=${[1,10,20,50,100][i%5]}`,
+        {headers:{"x-api-key":"acme","x-tier":"paid"}}).catch(()=>{});
+      await new Promise(r=>setTimeout(r,80));
+    }
+  });
+
+  const scanner = () => drive("scanner", async()=>{
+    // Metronomic, high-entropy, mostly 404 — the exact shape the feature extractor
+    // is built to notice: high request_rate, high regularity, high path_entropy.
+    for(let i=0;i<90;i++){
+      fetch(`/api/catalog/items/${90000+i}`,
+        {headers:{"x-api-key":"scanner-bot","x-tier":"free"}}).catch(()=>{});
+      await new Promise(r=>setTimeout(r,25));
+    }
+  });
+
+  const burst = () => drive("burst", async()=>{
+    await Promise.all(Array.from({length:60},()=>
+      fetch("/api/catalog/search?q=Cobalt",
+        {headers:{"x-api-key":"burst-client","x-tier":"free"}}).catch(()=>{})));
+  });
+
+  const t = metrics?.telemetry, lim = metrics?.limiter, an = metrics?.anomaly;
+  const lat = t?.latency||{};
+
+  return <div className="wrap">
+    <header>
+      <h1>Sentinel Gateway</h1>
+      <span className="sub">rate limiting · anomaly scoring · explanations</span>
+      <span className={"pill "+(err?"dead":"live")}>{err?"disconnected":"live"}</span>
+      {lim && <span className="pill">limiter: {lim.backend}</span>}
+      {an && <span className="pill">detector: {an.detector}</span>}
+      {metrics && <span className="pill">up {Math.round(t.uptime_sec)}s</span>}
+    </header>
+
+    <div className="btnrow">
+      <button className="primary" disabled={!!busy} onClick={normal}>
+        {busy==="normal"?"sending…":"Send normal traffic"}</button>
+      <button disabled={!!busy} onClick={priced}>
+        {busy==="pricing"?"quoting…":"Hit Java pricing"}</button>
+      <button className="danger" disabled={!!busy} onClick={scanner}>
+        {busy==="scanner"?"scanning…":"Simulate a scanner"}</button>
+      <button className="danger" disabled={!!busy} onClick={burst}>
+        {busy==="burst"?"bursting…":"Burst 60 (trip the limiter)"}</button>
+      <button onClick={()=>setLive(l=>!l)}>{live?"Pause":"Resume"} polling</button>
+    </div>
+
+    <div className="grid cards">
+      <Card label="Requests"     value={fmt(t?.counters?.requests_total||0)}
+            foot={`${fmt(metrics?.store?.distinct_clients||0)} clients`}/>
+      <Card label="Rate limited" value={fmt(t?.counters?.rate_limited_total||0)}
+            foot={`${t?.rate_limited_pct??0}% of traffic`} pct={t?.rate_limited_pct||0}/>
+      <Card label="Flagged"      value={fmt(t?.counters?.flagged_total||0)}
+            foot={`${t?.flagged_pct??0}% of traffic`} pct={t?.flagged_pct||0}/>
+      <Card label="p50 latency"  value={fmt(lat.p50_ms)+" ms"} foot={`mean ${fmt(lat.mean_ms)} ms`}/>
+      <Card label="p99 latency"  value={fmt(lat.p99_ms)+" ms"} foot={`max ${fmt(lat.max_ms)} ms`}/>
+      <Card label="Tracked"      value={fmt(lim?.tracked_clients||0)}
+            foot={`${fmt(lim?.policies||0)} policies`}/>
+    </div>
+
+    <div className="grid cols">
+      <div className="panel">
+        <h2>Live requests <span style={{color:"var(--dim)",fontWeight:400}}>click a row for detail</span></h2>
+        <Events events={events} onPick={setPicked}/>
+      </div>
+      <div>
+        <div className="panel" style={{marginBottom:12}}>
+          <h2>Flagged — why</h2>
+          <Flagged events={events}/>
+        </div>
+        <div className="panel">
+          <h2>Circuit breakers</h2>
+          <Breakers breakers={metrics?.breakers}/>
+        </div>
+      </div>
+    </div>
+
+    {picked && <div className="panel" style={{marginTop:12}}>
+      <h2>Request detail
+        <button style={{padding:"4px 9px"}} onClick={()=>setPicked(null)}>close</button></h2>
+      <div style={{padding:"12px 14px",fontFamily:"var(--mono)",fontSize:12}}>
+        <div><code>{picked.method} {picked.path}</code> → <span className={clsFor(picked.status)}>{picked.status}</span></div>
+        <div style={{marginTop:6,color:"var(--dim)"}}>
+          client <b style={{color:"var(--text)"}}>{picked.client_id}</b> · tier {picked.tier} ·
+          {" "}{picked.latency_ms.toFixed(2)}ms · upstream {picked.upstream||"—"} ·
+          {" "}limited {String(picked.limited)} · score {picked.anomaly_score.toFixed(4)}
+        </div>
+        {picked.reason && <div style={{marginTop:8,color:"#c9d4e0",fontFamily:"inherit"}}>{picked.reason}</div>}
+      </div>
+    </div>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

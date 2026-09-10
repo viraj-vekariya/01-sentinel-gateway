@@ -1,0 +1,49 @@
+# Gateway image. Multi-stage: the C++ toolchain is needed to BUILD the native limiter
+# but has no business in the runtime image - it would roughly triple the size and add
+# a compiler to the attack surface of an internet-facing service.
+FROM python:3.12-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        g++ make && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+COPY native/ ./native/
+RUN pip install --no-cache-dir pybind11 setuptools && \
+    python native/setup.py build_ext --inplace && \
+    cp sentinel_native*.so /install/
+
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim
+
+# Non-root. A gateway is the most exposed process in the system; running it as root
+# means a compromise starts with root rather than having to earn it.
+RUN useradd --create-home --uid 10001 sentinel
+
+COPY --from=build /install /usr/local
+WORKDIR /app
+COPY gateway/ ./gateway/
+COPY dashboard/ ./dashboard/
+COPY --from=build /install/sentinel_native*.so ./
+
+RUN mkdir -p /app/outputs && chown -R sentinel:sentinel /app
+USER sentinel
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SENTINEL_HOST=0.0.0.0 \
+    SENTINEL_PORT=8000 \
+    SENTINEL_DB=/app/outputs/sentinel.db
+
+EXPOSE 8000
+
+# Checks the app's own readiness, not just that a port is open - a process that has
+# bound a socket but cannot serve is exactly the state a health check must catch.
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request,sys; \
+        sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=2).status==200 else 1)"
+
+CMD ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "1", "--log-level", "info"]

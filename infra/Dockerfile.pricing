@@ -1,0 +1,25 @@
+# Java upstream. Multi-stage for the same reason as the gateway: Maven and the full
+# JDK are build-time only, and shipping them would take the image from ~200MB to
+# ~700MB for no runtime benefit.
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+# Copy the POM alone first so dependency resolution is cached independently of source
+# changes; editing a controller then does not re-download Spring Boot.
+COPY services/java-service/pom.xml .
+RUN mvn -B -q dependency:go-offline
+COPY services/java-service/src ./src
+RUN mvn -B -q package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+RUN addgroup -S pricing && adduser -S pricing -G pricing
+WORKDIR /app
+COPY --from=build /build/target/pricing-service-1.0.0.jar app.jar
+USER pricing
+ENV PRICING_PORT=8102
+EXPOSE 8102
+# Container-aware heap sizing. Without MaxRAMPercentage the JVM sizes its heap from
+# the HOST's memory, not the container limit, and gets OOM-killed under a cgroup cap.
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+UseSerialGC"
+HEALTHCHECK --interval=15s --timeout=3s --start-period=25s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8102/api/pricing/health || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

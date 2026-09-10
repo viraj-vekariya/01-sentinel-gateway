@@ -1,0 +1,45 @@
+# Fly.io deployment for the gateway.
+#
+#   fly launch --no-deploy --copy-config --config infra/fly.toml
+#   fly deploy --config infra/fly.toml --dockerfile infra/Dockerfile.gateway
+#
+# Fly builds the image remotely from the Dockerfile, so no local Docker daemon is
+# needed to deploy.
+
+app = "sentinel-gateway"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile.gateway"
+
+[env]
+  SENTINEL_HOST = "0.0.0.0"
+  SENTINEL_PORT = "8000"
+  SENTINEL_DB = "/data/sentinel.db"
+  SENTINEL_LLM_PROVIDER = "offline"
+
+[[mounts]]
+  source = "sentinel_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # A gateway that scales to zero has cold starts on the request path and loses its
+  # in-memory rate-limit buckets and anomaly baseline on every wake. One machine
+  # always running is the correct trade for this workload.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
