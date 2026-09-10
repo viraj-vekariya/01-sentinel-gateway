@@ -2,6 +2,8 @@
 
 **[▶ Live demo](https://viraj-vekariya.github.io/01-sentinel-gateway/)** — the token bucket runs in your browser, [verified against the compiled C++ extension](tools/check_js_matches_native.py).
 
+**[⇧ Deploy it yourself](https://render.com/deploy?repo=https://github.com/viraj-vekariya/01-sentinel-gateway)** — one click builds `render.yaml` on Render's free tier: the gateway and its Python upstream in one container. No card, no configuration.
+
 An API gateway in front of two polyglot backends (Python + Java), doing token-bucket
 rate limiting in a C++ extension, unsupervised anomaly scoring on request patterns,
 and human-readable explanations for anything it flags.
