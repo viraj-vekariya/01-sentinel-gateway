@@ -155,6 +155,15 @@ def main() -> int:
     normal_peak = max((peak.get(c, 0.0) for c in normal_clients), default=0.0)
     scanner_peak = peak.get("scanner-bot", 0.0)
 
+    # Which clients the gateway ACTUALLY flagged. This is the number that matters, and it
+    # is not the same as "whose peak crossed the threshold": the gateway flags on the
+    # SUSTAINED median of a client's recent scores, precisely because a single elevated
+    # score is noise on a cold baseline. An earlier version of this report derived
+    # "flagged" from the peak, so it reported false positives the gateway never raised -
+    # and the CI gate built on it failed on a perfectly healthy run.
+    flagged_clients = {e["client_id"] for e in events if e["flagged"]}
+    normal_flagged = sorted(flagged_clients & set(normal_clients))
+
     result = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "gateway": {"limiter_backend": metrics["limiter"]["backend"],
@@ -174,8 +183,13 @@ def main() -> int:
             "scanner_peak": round(scanner_peak, 4),
             "margin": round(scanner_peak - normal_peak, 4),
             "detector_threshold": metrics["anomaly"]["threshold"],
-            "scanner_flagged": scanner_peak >= metrics["anomaly"]["threshold"],
-            "any_normal_client_flagged": normal_peak >= metrics["anomaly"]["threshold"],
+            "detector_threshold_note": ("the gateway flags on the SUSTAINED median of a "
+                                        "client's recent scores, not on any single score; "
+                                        "the peaks above are diagnostic"),
+            "scanner_flagged": "scanner-bot" in flagged_clients,
+            "clients_actually_flagged": sorted(flagged_clients),
+            "normal_clients_flagged": normal_flagged,
+            "any_normal_client_flagged": bool(normal_flagged),
         },
         "top_clients": clients,
         "flagged_examples": [
@@ -194,7 +208,9 @@ def main() -> int:
     print(f"  scanner peak -> {sep['scanner_peak']}  (threshold {sep['detector_threshold']})")
     print(f"  worst normal -> {sep['worst_normal_client_peak']}")
     print(f"  margin       -> {sep['margin']}")
-    print(f"  false flags on normal clients: {sep['any_normal_client_flagged']}")
+    print(f"  clients actually flagged     : {sep['clients_actually_flagged']}")
+    print(f"  false flags on normal clients: {sep['any_normal_client_flagged']}"
+          f"{' -> ' + str(sep['normal_clients_flagged']) if sep['normal_clients_flagged'] else ''}")
     print(f"\n  wrote {dest.relative_to(ROOT)}")
     return 0
 
