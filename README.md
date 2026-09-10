@@ -1,5 +1,7 @@
 # Sentinel Gateway
 
+**[▶ Live demo](https://viraj-vekariya.github.io/01-sentinel-gateway/)** — the token bucket runs in your browser, [verified against the compiled C++ extension](tools/check_js_matches_native.py).
+
 An API gateway in front of two polyglot backends (Python + Java), doing token-bucket
 rate limiting in a C++ extension, unsupervised anomaly scoring on request patterns,
 and human-readable explanations for anything it flags.

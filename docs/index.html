@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel Gateway — releasing the GIL made it 12× slower</title>
+<meta name="description" content="An API gateway with a C++ token-bucket limiter. The benchmark falsified the premise: releasing the GIL per request is a 12x pessimisation.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.2/babel.min.js"></script>
+<style>
+  :root{--bg:#0b0f14;--panel:#131a23;--panel2:#182230;--line:#243040;--text:#e6edf3;
+        --dim:#8b9bb0;--accent:#4da3ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149;
+        --flag:#bc6cff;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 16px 70px}
+  header{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:18px}
+  h1{font-size:23px;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--dim);font-size:13.5px;max-width:80ch}
+  .links{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .links a{color:var(--accent);text-decoration:none;font:600 12px var(--mono);
+    border:1px solid var(--line);padding:6px 11px;border-radius:7px}
+  .banner{background:linear-gradient(90deg,rgba(77,163,255,.10),transparent);
+    border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;
+    padding:14px 16px;margin-bottom:18px}
+  .banner b{color:var(--accent)}
+  .grid{display:grid;gap:14px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}
+  .two{grid-template-columns:1fr 1fr}
+  @media(max-width:900px){.two{grid-template-columns:1fr}}
+  .card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .card{padding:12px 14px}
+  .card .label{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .card .value{font:600 20px/1.2 var(--mono);margin-top:5px}
+  .card .foot{color:var(--dim);font:11px var(--mono);margin-top:2px}
+  .panel{overflow:hidden;margin-top:14px}
+  .panel h2{font-size:12px;margin:0;padding:11px 14px;border-bottom:1px solid var(--line);
+    color:var(--dim);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+  .pad{padding:14px}
+  table{width:100%;border-collapse:collapse;font:12px var(--mono)}
+  th{background:var(--panel2);color:var(--dim);text-align:right;padding:7px 10px;
+     font-size:11px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:6px 10px;border-bottom:1px solid #1b2530;text-align:right}
+  tr.win td{background:rgba(63,185,80,.09)}
+  .ctl{display:flex;flex-direction:column;gap:4px}
+  .ctl label{font:11px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  input[type=range]{width:210px;accent-color:var(--accent)}
+  .controls{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  button{font:600 12px var(--mono);padding:9px 13px;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel2);color:var(--text)}
+  button:hover{border-color:var(--accent)} button.primary{background:var(--accent);
+    border-color:var(--accent);color:#06121f}
+  .ticks{display:flex;gap:3px;flex-wrap:wrap;margin-top:12px}
+  .tick{width:14px;height:22px;border-radius:3px}
+  .t-ok{background:var(--ok)} .t-no{background:var(--bad)}
+  .note{color:var(--dim);font-size:12.5px;padding:0 14px 14px;line-height:1.55;max-width:82ch}
+  .good{color:var(--ok)} .bad{color:var(--bad)} .flag{color:var(--flag)}
+  code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="root"><div class="wrap"><p style="color:#8b9bb0">loading…</p></div></div>
+<script src="bucket.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useMemo} = React;
+const fmt=n=>Math.round(n).toLocaleString();
+
+function App(){
+  const [d,setD]=useState(null); const [err,setErr]=useState("");
+  const [cap,setCap]=useState(5); const [rate,setRate]=useState(2); const [burst,setBurst]=useState(12);
+  useEffect(()=>{fetch("data.json").then(r=>r.json()).then(setD).catch(e=>setErr(String(e)));},[]);
+
+  // The token bucket, driven live. A burst of `burst` requests arriving at once, then one
+  // per second afterwards - the classic pattern the limiter exists to shape.
+  const sim = useMemo(()=>{
+    const b = makeBucket(cap, rate); const out=[];
+    for(let i=0;i<burst;i++) out.push(tryConsume(b, 1, 0));
+    for(let i=1;i<=8;i++) out.push(tryConsume(b, 1, i));
+    return out;
+  },[cap,rate,burst]);
+
+  if(err) return <div className="wrap"><p className="bad">{err}</p></div>;
+  if(!d) return <div className="wrap"><p className="sub">loading…</p></div>;
+
+  const B=d.bench, E=d.e2e, R=d.results;
+  const arms=["python","native_hold_gil","native_release_gil","native_batched"];
+  const dec=B.decomposition_at_8_threads;
+  const allowed=sim.filter(s=>s.allowed).length;
+
+  return <div className="wrap">
+    <header>
+      <h1>Sentinel Gateway — the benchmark falsified the premise</h1>
+      <div className="sub">
+        An API gateway in front of Python and Java microservices, with a token-bucket limiter
+        written in C++ and exposed via pybind11, unsupervised anomaly scoring, and
+        explanations for anything it flags.
+      </div>
+      <div className="links">
+        <a href="https://github.com/viraj-vekariya/01-sentinel-gateway">source on GitHub</a>
+        <a href="https://github.com/viraj-vekariya/01-sentinel-gateway/blob/main/DECISIONS.md">DECISIONS.md</a>
+        <a href="https://github.com/viraj-vekariya/01-sentinel-gateway/blob/main/outputs/bench_ratelimit.json">benchmark data</a>
+      </div>
+    </header>
+
+    <div className="banner">
+      <b>The finding:</b> the project began from the claim that moving the limiter into C++
+      and <i>releasing the GIL</i> would raise throughput. It does the opposite — releasing
+      the GIL per request is a <b>12× pessimisation</b>, because the release/reacquire round
+      trip costs far more than the ~200ns critical section it protects. The measurement
+      changed the production code: the request path now deliberately <b>holds</b> the GIL.
+    </div>
+
+    <div className="grid cards">
+      <div className="card"><div className="label">Compiled vs interpreted</div>
+        <div className="value good">{dec.compiled_vs_interpreted}×</div>
+        <div className="foot">the real win</div></div>
+      <div className="card"><div className="label">Releasing the GIL</div>
+        <div className="value bad">{dec.effect_of_releasing_gil}×</div>
+        <div className="foot">a 12× slowdown</div></div>
+      <div className="card"><div className="label">Batching releases</div>
+        <div className="value good">{dec.effect_of_batching_releases}×</div>
+        <div className="foot">recovery, batch {dec.batch_size}</div></div>
+      <div className="card"><div className="label">Net vs Python</div>
+        <div className="value">{dec.net_best_vs_python}×</div>
+        <div className="foot">best arm</div></div>
+      <div className="card"><div className="label">Anomaly separation</div>
+        <div className="value good">{E.separation.margin}</div>
+        <div className="foot">zero false positives</div></div>
+      <div className="card"><div className="label">Tests</div>
+        <div className="value">{R.tests.summary.split(" ")[0]}</div>
+        <div className="foot">{R.lines_of_code.total.toLocaleString()} lines</div></div>
+    </div>
+
+    <div className="panel">
+      <h2>The token bucket, running in your browser</h2>
+      <div className="pad">
+        <div className="controls">
+          <div className="ctl"><label>capacity — {cap} tokens</label>
+            <input type="range" min="1" max="20" value={cap} onChange={e=>setCap(+e.target.value)}/></div>
+          <div className="ctl"><label>refill — {rate}/sec</label>
+            <input type="range" min="1" max="10" value={rate} onChange={e=>setRate(+e.target.value)}/></div>
+          <div className="ctl"><label>burst size — {burst}</label>
+            <input type="range" min="1" max="30" value={burst} onChange={e=>setBurst(+e.target.value)}/></div>
+        </div>
+        <div style={{font:"12px var(--mono)",color:"var(--dim)"}}>
+          {burst} requests arrive at once, then one per second for 8 seconds ·
+          {" "}<b className="good">{allowed} allowed</b> · <b className="bad">{sim.length-allowed} rejected</b>
+        </div>
+        <div className="ticks">{sim.map((s,i)=>
+          <div key={i} className={"tick "+(s.allowed?"t-ok":"t-no")}
+               title={s.allowed ? `allowed, ${s.remaining.toFixed(2)} tokens left`
+                                : `rejected, retry after ${s.retryAfter.toFixed(2)}s`}/>)}
+        </div>
+      </div>
+      <div className="note">
+        The first {cap} requests drain the bucket, the rest are rejected, and the trailing
+        requests are allowed again as tokens refill. This is the real algorithm from
+        <code>native/src/token_bucket.cpp</code>, reimplemented in JavaScript and
+        <a style={{color:"var(--accent)"}} href="https://github.com/viraj-vekariya/01-sentinel-gateway/blob/main/tools/check_js_matches_native.py"> verified
+        against the compiled extension</a>. Note that a <i>rejected</i> request does not consume
+        a token — charging for a rejection would let a client already over its limit hold
+        itself over it.
+      </div>
+    </div>
+
+    <div className="panel">
+      <h2>Four arms, each isolating one variable · 40,000 requests per thread, best of 5</h2>
+      <div className="pad"><table>
+        <thead><tr><th>threads</th>{arms.map(a=><th key={a}>{a.replace(/_/g," ")}</th>)}</tr></thead>
+        <tbody>{B.config.thread_counts.map(t=>
+          <tr key={t}><td>{t}</td>{arms.map(a=>{
+            const s=B.samples.find(x=>x.backend===a&&x.threads===t);
+            return <td key={a} className={a==="native_release_gil"&&t===8?"bad":
+                                          a==="native_batched"?"good":""}>
+              {fmt(s.throughput)}</td>;})}</tr>)}
+        </tbody></table></div>
+      <div className="note">
+        requests/second. Read the <code>native_release_gil</code> column downward: it
+        <b> collapses</b> from {fmt(B.samples.find(x=>x.backend==="native_release_gil"&&x.threads===1).throughput)} to
+        {" "}{fmt(B.samples.find(x=>x.backend==="native_release_gil"&&x.threads===8).throughput)} as
+        threads are added. And note that <b>nothing scales</b> — every arm sits near 1.0× from
+        1 to 8 threads, because the Python-side loop holds the GIL regardless. A gateway's
+        concurrency has to come from async I/O, not from threading the limiter.
+      </div>
+    </div>
+
+    <div className="two">
+      <div className="panel" style={{marginTop:0}}>
+        <h2>End-to-end — the division of labour</h2>
+        <div className="pad"><table>
+          <thead><tr><th>traffic</th><th>requests</th><th>outcome</th></tr></thead>
+          <tbody>
+            <tr><td>normal (8 clients)</td><td>{E.phases.normal.requests}</td>
+              <td className="good">all served</td></tr>
+            <tr><td>pricing → Java upstream</td><td>{E.phases.pricing.requests}</td>
+              <td className="good">polyglot routing</td></tr>
+            <tr><td>burst from one client</td><td>{E.phases.burst.requests}</td>
+              <td className="bad">{E.phases.burst.status_codes["429"]} rate-limited</td></tr>
+            <tr><td>scanner (metronomic 404s)</td><td>{E.phases.scanner.requests}</td>
+              <td className="flag">flagged by the detector</td></tr>
+          </tbody></table></div>
+        <div className="note">
+          The burst was handled by the <b>rate limiter</b>; the scanner by the <b>anomaly
+          detector</b>. Different mechanisms answering different questions — <i>too many?</i>
+          versus <i>wrong shape?</i>
+        </div>
+      </div>
+
+      <div className="panel" style={{marginTop:0}}>
+        <h2>Why the flag is not the score</h2>
+        <div className="pad"><table>
+          <thead><tr><th>flagging rule</th><th>worst normal</th><th>weakest anomaly</th>
+            <th>margin</th></tr></thead>
+          <tbody>
+            <tr><td>this request's score</td><td>0.7666</td><td>0.8574</td>
+              <td className="bad">0.0908</td></tr>
+            <tr className="win"><td>median of the last 8</td>
+              <td>{E.separation.worst_normal_client_peak}</td>
+              <td>{E.separation.scanner_peak}</td>
+              <td className="good">{E.separation.margin}</td></tr>
+          </tbody></table></div>
+        <div className="note">
+          <b>6× wider separation and zero false positives</b>, on identical traffic. A cold
+          gateway's baseline is unstable, and taking a maximum over time always finds that
+          transient. A client that is genuinely misbehaving stays elevated.
+        </div>
+      </div>
+    </div>
+
+    {E.flagged_examples?.length>0 && <div className="panel">
+      <h2>What the detector said</h2>
+      <div className="pad">{[...new Map(E.flagged_examples.map(f=>[f.client_id,f])).values()].map((f,i)=>
+        <div key={i} style={{marginBottom:10}}>
+          <div style={{font:"600 12px var(--mono)",color:"var(--flag)"}}>
+            {f.client_id} · score {f.score}</div>
+          <div style={{fontSize:12.5,color:"#c9d4e0",marginTop:3}}>{f.reason}</div>
+        </div>)}</div>
+      <div className="note">Generated without a language model — the deterministic explainer
+        names the feature and how far it deviates. The LLM path exists and is opt-in.</div>
+    </div>}
+
+    <div className="panel">
+      <h2>Three bugs the tests found</h2>
+      <div className="pad"><table>
+        <thead><tr><th>bug</th><th>cost if unfixed</th></tr></thead>
+        <tbody>
+          <tr><td>SQLite <code>:memory:</code> gives each connection its own database</td>
+            <td>every threaded write vanished</td></tr>
+          <tr><td>shared-cache SQLite takes a table lock and ignores <code>timeout</code></td>
+            <td>three writers dropped rows</td></tr>
+          <tr><td>a fixed shared-cache name made every store the same database</td>
+            <td>tests saw each other's rows</td></tr>
+        </tbody></table></div>
+      <div className="note">Found by running it under concurrency, not by reading it. The
+        full list, with the anomaly-detector bugs, is in the README.</div>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
