@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10T08:58:36",
+  "generated_at": "2026-09-10T09:15:00",
   "gateway": {
     "limiter_backend": "native",
     "detector": "robust_z",
@@ -30,8 +30,8 @@
     "scanner": {
       "requests": 90,
       "status_codes": {
-        "404": 24,
-        "429": 66
+        "404": 25,
+        "429": 65
       }
     }
   },
@@ -41,13 +41,13 @@
     "status_5xx": 23,
     "flagged_total": 147,
     "status_4xx": 142,
-    "rate_limited_total": 118
+    "rate_limited_total": 117
   },
   "latency": {
     "count": 260,
-    "mean_ms": 4.587,
-    "min_ms": 0.004,
-    "max_ms": 159.739,
+    "mean_ms": 4.935,
+    "min_ms": 0.003,
+    "max_ms": 160.033,
     "p50_ms": 1.0,
     "p95_ms": 25.0,
     "p99_ms": 250.0
@@ -57,9 +57,9 @@
     "native_available": true,
     "policies": 6,
     "tracked_clients": 19,
-    "allowed": 142,
-    "denied": 118,
-    "deny_rate": 0.4538
+    "allowed": 143,
+    "denied": 117,
+    "deny_rate": 0.45
   },
   "anomaly": {
     "detector": "robust_z",
@@ -86,39 +86,39 @@
       "state": "open",
       "consecutive_failures": 5,
       "trips": 1,
-      "reset_in_sec": 9.5
+      "reset_in_sec": 9.3
     }
   },
   "peak_anomaly_score_by_client": {
-    "scanner-bot": 0.8968,
-    "burst-client": 0.9957,
-    "pricing-client": 0.9312,
-    "tyrell": 0.2148,
-    "wayne": 0.0671,
-    "stark": 0.1764,
-    "hooli": 0.145,
-    "umbrella": 0.0927,
-    "initech": 0.1516,
-    "globex": 0.0449,
-    "acme": 0.0124
+    "scanner-bot": 0.8934,
+    "burst-client": 0.9934,
+    "pricing-client": 0.8748,
+    "tyrell": 0.0087,
+    "wayne": 0.0883,
+    "stark": 0.1664,
+    "hooli": 0.1488,
+    "umbrella": 0.1751,
+    "initech": 0.003,
+    "globex": 0.1039,
+    "acme": 0.0787
   },
   "mean_anomaly_score_by_client": {
-    "scanner-bot": 0.834,
-    "burst-client": 0.9272,
-    "pricing-client": 0.7561,
-    "tyrell": 0.0555,
-    "wayne": 0.0232,
-    "stark": 0.0657,
-    "hooli": 0.0578,
-    "umbrella": 0.0287,
-    "initech": 0.0468,
-    "globex": 0.0051,
-    "acme": 0.0047
+    "scanner-bot": 0.8312,
+    "burst-client": 0.9237,
+    "pricing-client": 0.7281,
+    "tyrell": 0.0037,
+    "wayne": 0.0242,
+    "stark": 0.0605,
+    "hooli": 0.051,
+    "umbrella": 0.0518,
+    "initech": 0.0006,
+    "globex": 0.0249,
+    "acme": 0.0185
   },
   "separation": {
-    "worst_normal_client_peak": 0.2148,
-    "scanner_peak": 0.8968,
-    "margin": 0.682,
+    "worst_normal_client_peak": 0.1751,
+    "scanner_peak": 0.8934,
+    "margin": 0.7183,
     "detector_threshold": 0.65,
     "detector_threshold_note": "the gateway flags on the SUSTAINED median of a client's recent scores, not on any single score; the peaks above are diagnostic",
     "scanner_flagged": true,
@@ -128,16 +128,32 @@
       "scanner-bot"
     ],
     "normal_clients_flagged": [],
-    "any_normal_client_flagged": false
+    "any_normal_client_flagged": false,
+    "sustained_by_client": {
+      "scanner-bot": 0.8679,
+      "burst-client": 0.9905,
+      "pricing-client": 0.8333,
+      "tyrell": 0.0036,
+      "wayne": 0.0135,
+      "stark": 0.0575,
+      "hooli": 0.0307,
+      "umbrella": 0.0149,
+      "initech": 0.0001,
+      "globex": 0.0006,
+      "acme": 0.0013
+    },
+    "worst_normal_client_sustained": 0.0575,
+    "scanner_sustained": 0.8679,
+    "sustained_margin": 0.8104
   },
   "top_clients": [
     {
       "client_id": "scanner-bot",
       "tier": "free",
       "requests": 90,
-      "limited": 66,
+      "limited": 65,
       "flagged": 79,
-      "avg_score": 0.834
+      "avg_score": 0.8312
     },
     {
       "client_id": "burst-client",
@@ -145,7 +161,7 @@
       "requests": 60,
       "limited": 45,
       "flagged": 49,
-      "avg_score": 0.9272
+      "avg_score": 0.9237
     },
     {
       "client_id": "pricing-client",
@@ -153,79 +169,79 @@
       "requests": 30,
       "limited": 7,
       "flagged": 19,
-      "avg_score": 0.7561
+      "avg_score": 0.7281
     },
     {
       "client_id": "globex",
       "tier": "free",
       "requests": 7,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0068
-    },
-    {
-      "client_id": "hooli",
-      "tier": "free",
-      "requests": 7,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0597
-    },
-    {
-      "client_id": "initech",
-      "tier": "free",
-      "requests": 7,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0356
-    },
-    {
-      "client_id": "stark",
-      "tier": "free",
-      "requests": 7,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0496
-    },
-    {
-      "client_id": "tyrell",
-      "tier": "free",
-      "requests": 7,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0629
-    },
-    {
-      "client_id": "acme",
-      "tier": "free",
-      "requests": 6,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0055
-    },
-    {
-      "client_id": "umbrella",
-      "tier": "free",
-      "requests": 6,
-      "limited": 0,
-      "flagged": 0,
-      "avg_score": 0.0321
-    },
-    {
-      "client_id": "wayne",
-      "tier": "free",
-      "requests": 6,
       "limited": 0,
       "flagged": 0,
       "avg_score": 0.0267
     },
     {
+      "client_id": "hooli",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0511
+    },
+    {
+      "client_id": "initech",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0006
+    },
+    {
+      "client_id": "stark",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0459
+    },
+    {
+      "client_id": "tyrell",
+      "tier": "free",
+      "requests": 7,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0035
+    },
+    {
+      "client_id": "acme",
+      "tier": "free",
+      "requests": 6,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0208
+    },
+    {
+      "client_id": "umbrella",
+      "tier": "free",
+      "requests": 6,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0526
+    },
+    {
+      "client_id": "wayne",
+      "tier": "free",
+      "requests": 6,
+      "limited": 0,
+      "flagged": 0,
+      "avg_score": 0.0349
+    },
+    {
       "client_id": "acme",
       "tier": "paid",
       "requests": 4,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.0036
+      "avg_score": 0.015
     },
     {
       "client_id": "umbrella",
@@ -233,7 +249,7 @@
       "requests": 4,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.0238
+      "avg_score": 0.0505
     },
     {
       "client_id": "wayne",
@@ -241,7 +257,7 @@
       "requests": 4,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.0179
+      "avg_score": 0.0081
     },
     {
       "client_id": "globex",
@@ -249,7 +265,7 @@
       "requests": 3,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.001
+      "avg_score": 0.0207
     },
     {
       "client_id": "hooli",
@@ -257,7 +273,7 @@
       "requests": 3,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.0532
+      "avg_score": 0.0506
     },
     {
       "client_id": "initech",
@@ -265,7 +281,7 @@
       "requests": 3,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.0728
+      "avg_score": 0.0005
     },
     {
       "client_id": "stark",
@@ -273,7 +289,7 @@
       "requests": 3,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.1032
+      "avg_score": 0.0945
     },
     {
       "client_id": "tyrell",
@@ -281,34 +297,34 @@
       "requests": 3,
       "limited": 0,
       "flagged": 0,
-      "avg_score": 0.0383
+      "avg_score": 0.0042
     }
   ],
   "flagged_examples": [
     {
       "client_id": "scanner-bot",
-      "score": 0.8715,
-      "reason": "sustained 0.87 over 8 requests: request rate unusually high (67.8 MAD); path entropy unusually high (50.0 MAD)"
+      "score": 0.8681,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (65.8 MAD); path entropy unusually high (50.0 MAD)"
     },
     {
       "client_id": "scanner-bot",
-      "score": 0.8714,
-      "reason": "sustained 0.87 over 8 requests: request rate unusually high (67.8 MAD); path entropy unusually high (50.0 MAD)"
+      "score": 0.8684,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (66.0 MAD); path entropy unusually high (50.0 MAD)"
     },
     {
       "client_id": "scanner-bot",
-      "score": 0.8712,
-      "reason": "sustained 0.87 over 8 requests: request rate unusually high (67.7 MAD); path entropy unusually high (50.0 MAD)"
+      "score": 0.8684,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (66.0 MAD); path entropy unusually high (50.0 MAD)"
     },
     {
       "client_id": "scanner-bot",
-      "score": 0.8713,
-      "reason": "sustained 0.87 over 8 requests: request rate unusually high (67.7 MAD); path entropy unusually high (50.0 MAD)"
+      "score": 0.8686,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (66.1 MAD); path entropy unusually high (50.0 MAD)"
     },
     {
       "client_id": "scanner-bot",
-      "score": 0.8713,
-      "reason": "sustained 0.87 over 8 requests: request rate unusually high (67.7 MAD); path entropy unusually high (50.0 MAD)"
+      "score": 0.8687,
+      "reason": "sustained 0.87 over 8 requests: request rate unusually high (66.2 MAD); path entropy unusually high (50.0 MAD)"
     }
   ]
 }

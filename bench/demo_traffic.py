@@ -164,6 +164,14 @@ def main() -> int:
     flagged_clients = {e["client_id"] for e in events if e["flagged"]}
     normal_flagged = sorted(flagged_clients & set(normal_clients))
 
+    # The SUSTAINED separation - the one that matches how the gateway actually decides.
+    # The peak margin above is diagnostic and noisy: a cold baseline produces one high
+    # score for almost any client, so peak-vs-peak can look tight even when nothing was
+    # flagged. Median-vs-median is the comparison the flagging rule makes.
+    sustained = {k: round(statistics.median(v), 4) for k, v in by_client.items()}
+    normal_sustained = max((sustained.get(c, 0.0) for c in normal_clients), default=0.0)
+    scanner_sustained = sustained.get("scanner-bot", 0.0)
+
     result = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "gateway": {"limiter_backend": metrics["limiter"]["backend"],
@@ -190,6 +198,10 @@ def main() -> int:
             "clients_actually_flagged": sorted(flagged_clients),
             "normal_clients_flagged": normal_flagged,
             "any_normal_client_flagged": bool(normal_flagged),
+            "sustained_by_client": sustained,
+            "worst_normal_client_sustained": round(normal_sustained, 4),
+            "scanner_sustained": round(scanner_sustained, 4),
+            "sustained_margin": round(scanner_sustained - normal_sustained, 4),
         },
         "top_clients": clients,
         "flagged_examples": [
@@ -207,7 +219,9 @@ def main() -> int:
     print(f"  burst        -> {codes('burst')}")
     print(f"  scanner peak -> {sep['scanner_peak']}  (threshold {sep['detector_threshold']})")
     print(f"  worst normal -> {sep['worst_normal_client_peak']}")
-    print(f"  margin       -> {sep['margin']}")
+    print(f"  peak margin  -> {sep['margin']} (diagnostic; noisy on a cold baseline)")
+    print(f"  sustained    -> scanner {sep['scanner_sustained']} vs worst normal "
+          f"{sep['worst_normal_client_sustained']}, margin {sep['sustained_margin']}")
     print(f"  clients actually flagged     : {sep['clients_actually_flagged']}")
     print(f"  false flags on normal clients: {sep['any_normal_client_flagged']}"
           f"{' -> ' + str(sep['normal_clients_flagged']) if sep['normal_clients_flagged'] else ''}")

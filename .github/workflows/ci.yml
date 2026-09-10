@@ -99,9 +99,17 @@ jobs:
           sep = r["separation"]
           print(json.dumps(sep, indent=2))
           # These are the README's headline claims. If they stop holding, CI fails.
-          assert sep["scanner_flagged"], "scanner was not detected"
-          assert not sep["any_normal_client_flagged"], "false positive on a normal client"
-          assert sep["margin"] > 0.2, f"separation collapsed to {sep['margin']}"
+          #
+          # The separation is asserted on the SUSTAINED margin, not the peak margin. The
+          # gateway flags on the median of a client's recent scores, and peak-vs-peak is
+          # diagnostic only - on a cold baseline almost any client produces one high
+          # score, so the peak margin can read 0.04 on a run where nothing was falsely
+          # flagged at all. Gating on it failed exactly that way.
+          assert sep["scanner_flagged"], "the scanner was not detected"
+          assert not sep["any_normal_client_flagged"], \
+              f"false positive on {sep['normal_clients_flagged']}"
+          assert sep["sustained_margin"] > 0.2, \
+              f"sustained separation collapsed to {sep['sustained_margin']}"
           assert r["phases"]["burst"]["status_codes"].get("429", 0) > 20, \
               "rate limiter did not engage on the burst"
           print("e2e assertions passed")
