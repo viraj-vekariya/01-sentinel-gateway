@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -163,9 +164,22 @@ def create_app(cfg: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/health")
     async def health() -> Dict[str, object]:
+        breakers = state.proxy.snapshot()
+        # On the free tier only the Python upstream is deployed; a JVM does not fit in
+        # 512MB alongside the gateway. Saying so here is better than letting a reader
+        # conclude the Java service is broken - and the breaker tripping on /api/pricing
+        # is a genuine demonstration rather than a fault.
+        undeployed = [n for n, b in breakers.items()
+                      if "8102" in str(b.get("base_url", ""))
+                      and os.environ.get("SENTINEL_JAVA_DEPLOYED", "0") in ("0", "")]
         return {"status": "ok", "limiter_backend": state.limiter.backend,
                 "detector": state.scorer.state()["detector"],
-                "upstreams": state.proxy.snapshot()}
+                "upstreams": breakers,
+                "note": (f"{undeployed} is not deployed on this instance (a JVM does not "
+                         f"fit a 512MB free tier), so /api/pricing has no upstream and "
+                         f"the circuit breaker will trip - that is real, not a fault. "
+                         f"Run `make docker` locally for the full polyglot stack."
+                         if undeployed else None)}
 
     @app.get("/metrics")
     async def metrics() -> Dict[str, object]:

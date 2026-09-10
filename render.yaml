@@ -1,0 +1,20 @@
+# Render blueprint, free tier (512 MB).
+#
+# One container running the gateway plus the Python upstream. The Java pricing service is
+# not deployed - a JVM wants 150-250MB of a 512MB instance - so /api/pricing has no
+# upstream and trips the circuit breaker for real, which is worth seeing. /health says so.
+services:
+  - type: web
+    name: sentinel-gateway
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.render
+    dockerContext: .
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: SENTINEL_LLM_PROVIDER
+        value: offline
+      - key: SENTINEL_ANOMALY_MIN_CLIENTS
+        value: "5"

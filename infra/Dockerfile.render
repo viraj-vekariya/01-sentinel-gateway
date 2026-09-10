@@ -1,0 +1,58 @@
+# Single-container image for a 512MB free tier.
+#
+# Local development runs three containers (gateway + Python catalog + Java pricing) via
+# docker-compose. A free instance is one container with 512MB, and a JVM alone wants
+# 150-250MB of that, so this image runs the GATEWAY and the PYTHON upstream together and
+# leaves the Java upstream undeployed.
+#
+# That is not a fudge, and the deployed service says so on /health. It also makes the
+# circuit breaker genuinely demonstrable: /api/pricing has no upstream, so hitting it
+# trips the breaker for real and you can watch it move CLOSED -> OPEN -> HALF_OPEN. The
+# full polyglot stack is one `make docker` away locally.
+
+FROM python:3.12-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends g++ make \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY native/ ./native/
+RUN pip install --no-cache-dir pybind11 setuptools && \
+    python native/setup.py build_ext --inplace && cp sentinel_native*.so /install/
+
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim
+RUN useradd --create-home --uid 10001 sentinel
+COPY --from=build /install /usr/local
+WORKDIR /app
+
+COPY gateway/ ./gateway/
+COPY dashboard/ ./dashboard/
+COPY services/python-service/ ./services/python-service/
+COPY --from=build /install/sentinel_native*.so ./
+
+# Start both processes. A shell rather than supervisord: two processes with no restart
+# policy to express does not justify another dependency in the image.
+COPY <<'SH' /app/start.sh
+#!/bin/sh
+set -e
+python services/python-service/app.py &
+CATALOG_PID=$!
+# If the upstream dies the gateway should die too, so the platform restarts the pair
+# rather than serving a gateway with nothing behind it.
+trap "kill $CATALOG_PID 2>/dev/null" EXIT
+exec uvicorn gateway.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 1
+SH
+RUN chmod +x /app/start.sh && mkdir -p /app/outputs && chown -R sentinel:sentinel /app
+USER sentinel
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SENTINEL_DB=/app/outputs/sentinel.db \
+    CATALOG_HOST=127.0.0.1 \
+    CATALOG_PORT=8101 \
+    SENTINEL_UPSTREAM_PY=http://127.0.0.1:8101 \
+    SENTINEL_UPSTREAM_JAVA=http://127.0.0.1:8102
+
+EXPOSE 8000
+CMD ["/app/start.sh"]
